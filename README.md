@@ -72,105 +72,224 @@ Internet
 
 ---
 
-## 🧱 Step-by-Step Infrastructure Setup
+🧱 Step-by-Step Infrastructure Setup
+🧰 Optional: Custom VPC Setup (Beginners Can Skip This)
+If you're already using the default VPC, you may skip this section.
+However, creating a custom VPC helps in understanding how AWS networking components work together.
 
-### 1️⃣ Create a VPC and Public Subnet
-- Create a new VPC with a CIDR block like `10.0.0.0/16`
-- Add an Internet Gateway and attach to the VPC
-- Create a Route Table and associate it with a public subnet
-- Add a route for `0.0.0.0/0` to the Internet Gateway
+🧱 Steps to Set Up a Custom VPC:
+Create a VPC
 
-### 2️⃣ Launch EC2 Instance (Amazon Linux)
-- Use **Amazon Linux 2023 AMI**
-- Configure security group to allow port 22 (SSH) and 80 (HTTP)
-- User Data script to install Apache (httpd):
-  ```bash
-  #!/bin/bash
-  yum update -y
-  yum install httpd -y
-  systemctl start httpd
-  systemctl enable httpd
-  echo "Hi Hello from EC2 instance" > /var/www/html/index.html
-  ```
+CIDR block: 10.0.0.0/16
 
-### 3️⃣ Allocate and Attach Elastic IP
-- Go to EC2 > Elastic IPs > Allocate new address
-- Associate the EIP to the above EC2 instance
+Name: MyVPC or similar
 
-### 4️⃣ Create a Launch Template
-- Create a new Launch Template using the configuration from the EC2 instance
-- Use the same AMI, security group, and instance type
-- Add the above user data script in the template
+Create a Public Subnet
 
-### 5️⃣ Create a Target Group
-- Protocol: HTTP, Port: 80
-- Target type: Instance
-- Health check path: `/`
+CIDR block: 10.0.1.0/24
 
-### 6️⃣ Create an Application Load Balancer
-- Type: Internet-facing, HTTP on port 80
-- Assign public subnets in at least 2 AZs
-- Register the Target Group
+Availability Zone: Choose one (e.g., ap-south-1a)
 
-### 7️⃣ Create an Auto Scaling Group
-- Attach the Launch Template
-- Attach the Target Group
-- Set desired capacity: 1, min: 1, max: 2
+Create and Attach an Internet Gateway
 
-### 8️⃣ Test Setup
-- Access the site via Elastic IP and ALB DNS
-- Stop or terminate an instance to test Auto Scaling replacement
+Go to VPC → Internet Gateways
+
+Create a new gateway and attach it to your VPC
+
+Create a Route Table
+
+Add a route: 0.0.0.0/0 → Internet Gateway
+
+Associate the route table with the public subnet
+
+Enable Auto-assign Public IP
+
+When launching EC2 in this subnet, ensure public IP assignment is enabled
+
+🔍 Why Use a Custom VPC?
+Full control over your network (IP ranges, routing, firewall)
+
+Practice real-world cloud architectures
+
+Segregate environments (dev, test, prod)
+
+✅ This setup enables EC2 instances in the public subnet to access the internet.
 
 ---
 
-## 💡 Use Cases
+2️⃣ Launch an EC2 Instance (Amazon Linux)
+AMI: Use Amazon Linux 2023 (free tier eligible)
 
-- Hosting a **simple web application** with auto-recovery
-- Learning **AWS Auto Scaling, ALB, and Launch Templates**
-- Building **cost-effective fault-tolerant environments**
-- **DevOps automation practice** for production setups
+Instance Type: t2.micro (or any desired type)
 
+Security Group:
+
+Inbound: Allow SSH (22) and HTTP (80)
+
+User Data Script (automates Apache install & web content):
+
+bash
+Copy
+Edit
+#!/bin/bash
+yum update -y
+yum install httpd -y
+systemctl start httpd
+systemctl enable httpd
+echo "Hi Hello from EC2 instance" > /var/www/html/index.html
+Verify EC2 is accessible via its public IP on port 80
 ---
 
-## ⚙️ Elastic IP — Use and Advantages
+3️⃣ Allocate and Attach Elastic IP
+Go to EC2 → Elastic IPs → Allocate Address
 
-- Provides a **fixed public IP** to an EC2 instance.
-- Avoids frequent IP changes on stop/start cycles.
-- Ideal for DNS mapping, monitoring, and consistent SSH access.
-- Can be **re-associated** quickly to new instances if needed.
-- Helps in maintaining **reliable public endpoints** during Auto Scaling operations.
+Allocate a new Elastic IP
 
+Associate this IP to the EC2 instance
+
+🔁 Why?
+
+Keeps the public IP constant across reboots
+
+Useful for DNS, remote access, and monitoring consistency
+
+Can be quickly reassigned if the instance fails or is replaced
 ---
 
-## 💸 Cost Optimization Tips
+4️⃣ Create a Launch Template
+Navigate to EC2 → Launch Templates → Create New
 
-| Strategy | Benefit |
-|---------|---------|
-| **Use Amazon Linux** | Free-tier eligible and lightweight |
-| **Set min=1 in ASG** | Only one instance running unless needed |
-| **Scale-out only on demand** | Avoid over-provisioning |
-| **Release unused EIP** | Avoid being charged when not in use |
-| **Monitor with CloudWatch** | Detect abnormal usage patterns |
+Use configuration from the previous EC2:
 
+Same AMI, instance type, security group
+
+Paste the same User Data Script
+
+Enable instance monitoring (optional)
+
+🔄 This template will be used by the Auto Scaling Group to launch identical EC2s.
 ---
 
-## 📌 Output
+5️⃣ Create a Target Group
+Navigate to EC2 → Target Groups → Create
 
-- Static HTML page (`Hi Hello`) is served on both:
-  - Elastic IP (`http://<Elastic-IP>`)
-  - ALB DNS (`http://<ALB-DNS>`)
+Target Type: Instance
 
-- Auto Scaling ensures:
-  - Fault tolerance (if an instance fails, another is launched)
-  - Load distribution via ALB
-  - Consistent user experience
+Protocol: HTTP
 
+Port: 80
+
+Health check path: /
+
+Register your test EC2 instance to verify health check logic
+
+💡 Health checks keep track of instance health and remove unhealthy instances from load balancer routing.
 ---
 
-## ✅ Conclusion
+6️⃣ Create an Application Load Balancer (ALB)
+Navigate to Load Balancers → Create ALB
 
-This project illustrates the power of **AWS Auto Scaling**, **Load Balancing**, and **Launch Templates** in building **robust, scalable web infrastructures**. With a clean separation of components, dynamic scaling, and cost-efficiency, it’s an ideal starting point for production-grade cloud applications.
+Type: Application Load Balancer
 
+Scheme: Internet-facing
+
+Listeners: HTTP on port 80
+
+AZs: Select 2+ public subnets in different AZs
+
+Attach to the Target Group from previous step
+
+🌐 ALB automatically distributes incoming traffic across healthy EC2s in the group.
 ---
 
+7️⃣ Create an Auto Scaling Group
+Navigate to Auto Scaling Groups → Create ASG
 
+Select the Launch Template
+
+Attach the Target Group
+
+Set:
+
+Desired capacity: 1
+
+Minimum: 1
+
+Maximum: 2
+
+Enable health check replacement and scaling policies (optional)
+
+Select both public subnets for instance placement
+
+
+🔁 ASG will launch, terminate, and replace instances as needed for high availability.
+
+8️⃣ Test and Validate Setup
+Access the Elastic IP in the browser → should show:
+Hi Hello from EC2 instance
+
+Access the ALB DNS name in the browser → same response
+
+Manually terminate instance from EC2 dashboard:
+
+Auto Scaling Group should automatically launch a replacement
+
+Watch health status in Target Group
+---
+🖼️ Project Architecture Diagram
+pgsql
+Copy
+Edit
+User Request
+     ↓
++-------------------------+
+| Application Load Balancer |
++-------------------------+
+       ↓
+  Target Group
+       ↓
+ Auto Scaling Group
+   ↓        ↓
+EC2-1     EC2-2
+ (Amazon Linux + Apache)
+   ↓
+Public Subnet → VPC → Internet Gateway
+💡 Use Cases
+Hosting lightweight or production-grade web applications
+
+Automated recovery using health checks and scaling
+
+Building reliable, fault-tolerant AWS architectures
+
+DevOps/CI-CD pipelines for deploying infrastructure-as-code
+
+⚙️ Elastic IP – Use & Advantages
+🔹 Fixed Public IP Address – Useful for consistent external access (e.g., browser or SSH)
+
+🔹 DNS Mapping – Avoids need to update records after stop/start
+
+🔹 Auto Scaling Recovery – Can be manually or programmatically re-associated with new instance
+
+🔹 Reliable Monitoring – Monitoring agents/tools can use fixed IPs
+
+💸 Cost Optimization Tips
+Use Amazon Linux 2023 AMI (free tier eligible)
+
+Choose t2.micro or t3.micro (within free tier or low cost)
+
+Keep min=1 and max=2 for Auto Scaling
+
+Terminate test resources when not in use
+
+Set up CloudWatch alarms to monitor usage and costs
+
+Use Savings Plans or Reserved Instances for long-term deployments
+
+✅ Final Output
+Web server accessible via Elastic IP and ALB DNS
+
+Automatic instance replacement when failed
+
+Load balancing across instances if scaled up
+
+Easily replicable and extensible architecture
