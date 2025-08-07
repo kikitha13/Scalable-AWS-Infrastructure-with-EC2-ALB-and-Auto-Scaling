@@ -402,4 +402,4 @@ This project effectively demonstrates a highly available, auto-scaling web setup
 
 ---
 
-**Feel free to fork, star, and contribute!** 🚀
+**Feel free to fork, star, and contribute!** 
